@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Alem Local-First Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .status {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .document {
+            border: 1px solid #eee;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .document.synced {
+            border-color: #4CAF50;
+            background: #f8fff8;
+        }
+        .document.pending {
+            border-color: #ff9800;
+            background: #fff8f0;
+        }
+        .document.conflict {
+            border-color: #f44336;
+            background: #fff0f0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Alem Local-First Document Management</h1>
+    
+    <div class="status" id="status">
+        <strong>Status:</strong> <span id="connection-status">Initializing...</span> |
+        <strong>User:</strong> <span id="user-id">Not logged in</span> |
+        <strong>Pending Operations:</strong> <span id="pending-count">0</span>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Authentication</h2>
+            <div id="auth-section">
+                <input type="text" id="username" placeholder="Username" value="demo_user">
+                <input type="email" id="email" placeholder="Email" value="demo@example.com">
+                <button onclick="initializeUser()">Initialize Local User</button>
+                <button onclick="generateDID()">Generate DID</button>
+                <button onclick="setOnlineMode()" id="online-btn">Go Online</button>
+                <button onclick="setOfflineMode()" id="offline-btn" disabled>Go Offline</button>
+            </div>
+            
+            <h2>Document Management</h2>
+            <div>
+                <input type="text" id="doc-filename" placeholder="Filename" value="example.txt">
+                <textarea id="doc-content" placeholder="Document content" rows="4">Hello, local-first world!</textarea>
+                <input type="file" id="file-input" onchange="handleFileUpload(event)">
+                <button onclick="createDocument()">Create Document</button>
+                <button onclick="loadDocuments()">Refresh Documents</button>
+            </div>
+            
+            <h2>Search</h2>
+            <div>
+                <input type="text" id="search-query" placeholder="Search documents...">
+                <button onclick="searchDocuments()">Search</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Sync Operations</h2>
+            <div>
+                <button onclick="syncToServer()">Sync to Server</button>
+                <button onclick="syncFromServer()">Sync from Server</button>
+                <button onclick="getSyncStatus()">Get Sync Status</button>
+                <button onclick="retryFailedOperations()">Retry Failed</button>
+            </div>
+            
+            <h2>Documents</h2>
+            <div id="documents-list">
+                <p>No documents loaded</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Activity Log</h2>
+        <div class="log" id="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script type="module">
+        import init, { AlemClient } from './pkg/alem_client.js';
+
+        let client = null;
+        let isOnline = false;
+        let currentUserId = null;
+
+        // Initialize WASM module
+        async function initWasm() {
+            try {
+                await init();
+                log('WASM module initialized successfully');
+            } catch (error) {
+                log(`Failed to initialize WASM: ${error}`);
+            }
+        }
+
+        // Initialize user
+        window.initializeUser = async function() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            
+            if (!username || !email) {
+                log('Please enter username and email');
+                return;
+            }
+
+            try {
+                currentUserId = `user_${Date.now()}`;
+                client = new AlemClient(currentUserId);
+                await client.init_database();
+                
+                document.getElementById('user-id').textContent = username;
+                log(`User initialized: ${username} (${currentUserId})`);
+                
+                // Update UI
+                updateConnectionStatus();
+                loadDocuments();
+                
+            } catch (error) {
+                log(`Failed to initialize user: ${error}`);
+            }
+        };
+
+        // Generate DID
+        window.generateDID = async function() {
+            if (!client) {
+                log('Please initialize user first');
+                return;
+            }
+
+            try {
+                const result = await client.generate_did('key');
+                log(`Generated DID: ${result.did}`);
+            } catch (error) {
+                log(`Failed to generate DID: ${error}`);
+            }
+        };
+
+        // Create document
+        window.createDocument = async function() {
+            if (!client) {
+                log('Please initialize user first');
+                return;
+            }
+
+            const filename = document.getElementById('doc-filename').value;
+            const content = document.getElementById('doc-content').value;
+
+            if (!filename || !content) {
+                log('Please enter filename and content');
+                return;
+            }
+
+            try {
+                const encoder = new TextEncoder();
+                const contentBytes = encoder.encode(content);
+
+                const document = await client.create_document({
+                    filename: filename,
+                    content: Array.from(contentBytes),
+                    content_type: 'text/plain',
+                    metadata: {
+                        created_by: 'demo_user',
+                        source: 'web_interface'
+                    },
+                    tags: ['demo', 'local-first']
+                });
+
+                log(`Document created: ${document.filename} (${document.id})`);
+                loadDocuments();
+                updatePendingCount();
+
+                // Clear form
+                document.getElementById('doc-filename').value = '';
+                document.getElementById('doc-content').value = '';
+
+            } catch (error) {
+                log(`Failed to create document: ${error}`);
+            }
+        };
+
+        // Handle file upload
+        window.handleFileUpload = async function(event) {
+            if (!client) {
+                log('Please initialize user first');
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const contentBytes = new Uint8Array(arrayBuffer);
+
+                const document = await client.create_document({
+                    filename: file.name,
+                    content: Array.from(contentBytes),
+                    content_type: file.type,
+                    metadata: {
+                        original_size: file.size,
+                        last_modified: new Date(file.lastModified).toISOString()
+                    },
+                    tags: ['upload']
+                });
+
+                log(`File uploaded: ${document.filename} (${document.id})`);
+                loadDocuments();
+                updatePendingCount();
+
+            } catch (error) {
+                log(`Failed to upload file: ${error}`);
+            }
+        };
+
+        // Load documents
+        window.loadDocuments = async function() {
+            if (!client) return;
+
+            try {
+                const documents = await client.get_documents();
+                displayDocuments(documents);
+                log(`Loaded ${documents.length} documents`);
+            } catch (error) {
+                log(`Failed to load documents: ${error}`);
+            }
+        };
+
+        // Search documents
+        window.searchDocuments = async function() {
+            if (!client) return;
+
+            const query = document.getElementById('search-query').value;
+            if (!query) {
+                loadDocuments();
+                return;
+            }
+
+            try {
+                const results = await client.search_documents(query);
+                displayDocuments(results);
+                log(`Search found ${results.length} documents for: ${query}`);
+            } catch (error) {
+                log(`Search failed: ${error}`);
+            }
+        };
+
+        // Display documents
+        function displayDocuments(documents) {
+            const container = document.getElementById('documents-list');
+            
+            if (documents.length === 0) {
+                container.innerHTML = '<p>No documents found</p>';
+                return;
+            }
+
+            const html = documents.map(doc => {
+                const statusClass = doc.is_synced ? 'synced' : 
+                                  doc.needs_upload ? 'pending' : 
+                                  doc.has_conflict ? 'conflict' : '';
+                
+                const statusText = doc.is_synced ? 'Synced' :
+                                 doc.needs_upload ? 'Pending Upload' :
+                                 doc.has_conflict ? 'Conflict' : 'Local';
+
+                return `
+                    <div class="document ${statusClass}">
+                        <strong>${doc.filename}</strong> (${doc.content_type})
+                        <br>Size: ${formatBytes(doc.file_size)} | Status: ${statusText}
+                        <br>Tags: ${doc.tags.join(', ')}
+                        <br>Created: ${new Date(doc.created_at).toLocaleString()}
+                        <br><button onclick="viewDocument('${doc.id}')">View Content</button>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        // View document content
+        window.viewDocument = async function(documentId) {
+            if (!client) return;
+
+            try {
+                const content = await client.get_document_content(documentId);
+                const decoder = new TextDecoder();
+                const text = decoder.decode(content);
+                
+                // Show in a simple modal/alert for demo
+                alert(`Document Content:\n\n${text}`);
+                
+            } catch (error) {
+                log(`Failed to view document: ${error}`);
+            }
+        };
+
+        // Sync operations
+        window.syncToServer = async function() {
+            if (!client || !isOnline) {
+                log('Client not initialized or offline');
+                return;
+            }
+
+            try {
+                log('Starting sync to server...');
+                const result = await client.sync_to_server();
+                log(`Sync to server completed: ${result.operations_synced} operations synced`);
+                loadDocuments();
+                updatePendingCount();
+            } catch (error) {
+                log(`Sync to server failed: ${error}`);
+            }
+        };
+
+        window.syncFromServer = async function() {
+            if (!client || !isOnline) {
+                log('Client not initialized or offline');
+                return;
+            }
+
+            try {
+                log('Starting sync from server...');
+                const result = await client.sync_from_server();
+                log(`Sync from server completed: ${result.changes_applied} changes applied`);
+                loadDocuments();
+            } catch (error) {
+                log(`Sync from server failed: ${error}`);
+            }
+        };
+
+        window.getSyncStatus = async function() {
+            if (!client) return;
+
+            try {
+                const status = await client.get_sync_status();
+                log(`Sync Status: ${JSON.stringify(status, null, 2)}`);
+            } catch (error) {
+                log(`Failed to get sync status: ${error}`);
+            }
+        };
+
+        window.retryFailedOperations = async function() {
+            if (!client) return;
+
+            try {
+                // This would be implemented in the Rust client
+                log('Retry failed operations not yet implemented');
+            } catch (error) {
+                log(`Failed to retry operations: ${error}`);
+            }
+        };
+
+        // Online/Offline mode
+        window.setOnlineMode = function() {
+            isOnline = true;
+            document.getElementById('online-btn').disabled = true;
+            document.getElementById('offline-btn').disabled = false;
+            updateConnectionStatus();
+            log('Switched to ONLINE mode');
+            
+            if (client) {
+                client.set_auto_sync(true);
+            }
+        };
+
+        window.setOfflineMode = function() {
+            isOnline = false;
+            document.getElementById('online-btn').disabled = false;
+            document.getElementById('offline-btn').disabled = true;
+            updateConnectionStatus();
+            log('Switched to OFFLINE mode');
+            
+            if (client) {
+                client.set_auto_sync(false);
+            }
+        };
+
+        // Update UI
+        function updateConnectionStatus() {
+            const status = isOnline ? 'Online' : 'Offline';
+            document.getElementById('connection-status').textContent = status;
+        }
+
+        async function updatePendingCount() {
+            if (!client) return;
+            
+            try {
+                const count = await client.get_pending_operations_count();
+                document.getElementById('pending-count').textContent = count;
+            } catch (error) {
+                console.error('Failed to update pending count:', error);
+            }
+        }
+
+        // Logging
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        window.clearLog = function() {
+            document.getElementById('log').innerHTML = '';
+        };
+
+        // Utility functions
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Initialize on page load
+        initWasm();
+
+        // Simulate network status changes
+        window.addEventListener('online', () => {
+            log('Browser detected online status');
+            if (isOnline && client) {
+                // Trigger sync
+                syncToServer();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            log('Browser detected offline status');
+        });
+
+        // Auto-update pending count every 5 seconds
+        setInterval(updatePendingCount, 5000);
+    </script>
+</body>
+</html>
