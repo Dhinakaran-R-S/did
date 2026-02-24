@@ -1,0 +1,68 @@
+[package]
+name = "alem-desktop"
+version = "0.1.0"
+description = "ALEM local-first desktop client"
+edition = "2021"
+
+[lib]
+name = "alem_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "alem-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri core
+tauri            = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell        = "2"
+tauri-plugin-dialog       = "2"
+tauri-plugin-fs           = "2"
+tauri-plugin-http         = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-store        = "2"
+
+# ─── LibSQL ──────────────────────────────────────────────────────────────────
+# libsql crate gives us an embedded SQLite-compatible engine with optional
+# Turso remote replica sync built-in.  We use the local embedded mode
+# (no network feature needed unless you want Turso).
+libsql = "0.6"
+#   Use plain `libsql = "0.6"` if you only want local SQLite with no Turso.
+
+# OS keychain for OAuth tokens + DID private keys (never in DB)
+keyring = "2"
+
+# DID key generation (Ed25519)
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+sha2          = "0.10"
+base58        = "0.2"
+
+# HTTP — Phoenix REST sync + S3 upload
+reqwest = { version = "0.12", features = ["json", "multipart"] }
+
+# Async runtime (Tauri uses tokio internally; re-export it)
+tokio = { version = "1", features = ["full"] }
+
+# Serde
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utilities
+uuid    = { version = "1", features = ["v4"] }
+chrono  = { version = "0.4", features = ["serde"] }
+anyhow  = "1"
+thiserror = "1"
+rand    = "0.8"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic         = "abort"
+codegen-units = 1
+lto           = true
+opt-level     = "s"
+strip         = true
