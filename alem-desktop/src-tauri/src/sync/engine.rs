@@ -180,13 +180,13 @@ async fn upload_document(
     let ct         = content_type.unwrap_or_else(|| "application/octet-stream".into());
     let file_bytes = tokio::fs::read(&local_path).await
         .with_context(|| format!("Cannot read {local_path}"))?;
-
-    client
-        .put(upload_url)
-        .header("Content-Type", &ct)
-        .body(file_bytes)
-        .send().await?
-        .error_for_status()?;
+        
+        
+        client
+    .put(upload_url)
+    .body(file_bytes)
+    .send().await?
+    .error_for_status()?;
 
     // 3. Tell Phoenix the upload is done
     client

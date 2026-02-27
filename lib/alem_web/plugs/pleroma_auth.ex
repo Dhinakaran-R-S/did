@@ -60,6 +60,12 @@ defmodule AlemWeb.Plugs.PleromaAuth do
   end
 
   # Verify token with Pleroma API
+
+
+  # defp verify_token("test-token-123") do
+  #   {:ok, %{"id" => "12345", "username" => "testuser", "acct" => "testuser"}}
+  # end
+
   defp verify_token(token) do
     pleroma_base_url = Application.get_env(:alem, :pleroma, [])[:base_url] ||
       System.get_env("PLEROMA_BASE_URL") ||

@@ -7,6 +7,7 @@ defmodule Alem.PleromaMockServer do
   require Logger
 
   plug Plug.Parsers, parsers: [:urlencoded, :json], json_decoder: Jason
+  plug :cors_headers
   plug :match
   plug :dispatch
 
@@ -24,7 +25,6 @@ defmodule Alem.PleromaMockServer do
     port = Keyword.get(opts, :port, 4001)
     Logger.info("Starting Pleroma mock server on port #{port}")
 
-    # Start Bandit server
     Bandit.start_link(
       plug: __MODULE__,
       port: port,
@@ -153,18 +153,18 @@ defmodule Alem.PleromaMockServer do
     }))
   end
 
-  # Verify credentials (for OAuth token verification)
+  # Verify credentials
   get "/api/v1/accounts/verify_credentials" do
-    # Extract token from Authorization header
     auth_header = List.first(Plug.Conn.get_req_header(conn, "authorization")) || ""
+    token = String.replace(auth_header, "Bearer ", "")
+    user_id = :crypto.hash(:md5, token) |> Base.encode16() |> String.slice(0, 8)
 
-    # Mock account info
     account_info = %{
-      id: "12345",
-      username: "test_user",
-      acct: "test_user@localhost",
-      display_name: "Test User",
-      note: "Test account for namespace integration",
+      id: user_id,
+      username: "user_#{user_id}",
+      acct: "user_#{user_id}@localhost",
+      display_name: "User #{user_id}",
+      note: "",
       avatar: "",
       avatar_static: "",
       header: "",
@@ -185,23 +185,11 @@ defmodule Alem.PleromaMockServer do
     |> send_resp(200, Jason.encode!(account_info))
   end
 
-  # Root endpoint
+  # Root
   get "/" do
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(%{
-      message: "Pleroma Mock Server",
-      version: "1.0.0",
-      endpoints: [
-        "POST /api/v1/apps",
-        "POST /oauth/token",
-        "POST /api/account/register",
-        "GET /api/v1/pleroma/captcha",
-        "POST /api/pleroma/delete_account",
-        "POST /api/pleroma/disable_account",
-        "GET /api/v1/pleroma/accounts/mfa"
-      ]
-    }))
+    |> send_resp(200, Jason.encode!(%{message: "Pleroma Mock Server", version: "1.0.0"}))
   end
 
   # Catch-all
@@ -209,6 +197,21 @@ defmodule Alem.PleromaMockServer do
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(404, Jason.encode!(%{error: "Not found", path: conn.request_path}))
+  end
+
+  # ── CORS plug ────────────────────────────────────────────────────────────
+  defp cors_headers(conn, _opts) do
+    conn =
+      conn
+      |> put_resp_header("access-control-allow-origin", "*")
+      |> put_resp_header("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS")
+      |> put_resp_header("access-control-allow-headers", "content-type, authorization")
+
+    if conn.method == "OPTIONS" do
+      conn |> send_resp(200, "") |> halt()
+    else
+      conn
+    end
   end
 
   defp generate_id(length) do

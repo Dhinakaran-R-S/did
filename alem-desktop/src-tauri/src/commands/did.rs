@@ -68,6 +68,29 @@ pub async fn validate_did(did: String) -> Result<bool, String> {
     Ok(did.starts_with("did:key:z") && did.len() > 12)
 }
 
+
+#[tauri::command]
+pub async fn store_server_did(
+    did: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    // Store server-generated DID in local SQLite
+    // No private key — server holds the keypair
+    let conn = state.db.connect().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE local_identity
+         SET did = ?1, did_public_key = ?2, updated_at = datetime('now')
+         WHERE id = 'singleton'",
+        libsql::params![
+            did.clone(),
+            did.replace("did:key:", "")  // public key is the multibase part
+        ],
+    ).await.map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+
 fn base64_simple(bytes: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();

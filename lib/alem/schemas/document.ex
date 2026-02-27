@@ -21,5 +21,6 @@ defmodule Alem.Schemas.Document do
     document
     |> cast(attrs, [:id, :tenant_id, :user_id, :filename, :content_type, :object_key, :content_hash, :text_content, :metadata, :status])
     |> validate_required([:id, :tenant_id, :user_id, :filename])
+    |> unique_constraint(:id, name: :documents_pkey)
   end
 end

@@ -36,6 +36,9 @@ defmodule Alem.Application do
       end
 
     opts = [strategy: :one_for_one, name: Alem.Supervisor]
+
+    Task.start(fn -> Alem.LocalFirst.SqldSchema.setup() end)
+
     Supervisor.start_link(children, opts)
   end
 

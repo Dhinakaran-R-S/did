@@ -57,6 +57,7 @@ pub fn run() {
             commands::did::generate_did,
             commands::did::get_stored_did,
             commands::did::validate_did,
+            commands::did::store_server_did,
             // Documents
             commands::documents::create_document,
             commands::documents::get_documents,

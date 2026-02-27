@@ -51,5 +51,11 @@ defmodule AlemWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+
+  plug Corsica,
+  origins: ["http://localhost:1420", "http://localhost:4000", "tauri://localhost"],
+  allow_headers: :all,
+  allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  
   plug AlemWeb.Router
 end

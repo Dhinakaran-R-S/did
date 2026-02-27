@@ -66,6 +66,9 @@ defmodule AlemWeb.Router do
     get "/sync/changes", SyncController, :get_changes
     post "/sync/apply", SyncController, :apply_changes
     get "/health", HealthController, :check
+    post "/sync/upload-url", SyncController, :get_upload_url
+    put "/sync/upload/:doc_id", SyncController, :upload_file
+
   end
 
   scope "/api/swagger" do

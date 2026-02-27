@@ -53,8 +53,8 @@ pub async fn get_oauth_token() -> Result<Option<String>, String> {
 #[tauri::command]
 pub async fn clear_oauth_token() -> Result<(), String> {
     let entry = Entry::new(KEYRING_SERVICE, OAUTH_KEY).map_err(|e| e.to_string())?;
-    entry.delete_credential().map_err(|e| e.to_string())?;
-    Ok(())
+    entry.delete_password().map_err(|e| e.to_string())?;
+        Ok(())
 }
 
 #[tauri::command]

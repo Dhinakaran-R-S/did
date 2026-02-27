@@ -26,11 +26,8 @@ tauri-plugin-notification = "2"
 tauri-plugin-store        = "2"
 
 # ─── LibSQL ──────────────────────────────────────────────────────────────────
-# libsql crate gives us an embedded SQLite-compatible engine with optional
-# Turso remote replica sync built-in.  We use the local embedded mode
-# (no network feature needed unless you want Turso).
-libsql = "0.6"
-#   Use plain `libsql = "0.6"` if you only want local SQLite with no Turso.
+
+libsql = "0.9"
 
 # OS keychain for OAuth tokens + DID private keys (never in DB)
 keyring = "2"
@@ -56,6 +53,8 @@ chrono  = { version = "0.4", features = ["serde"] }
 anyhow  = "1"
 thiserror = "1"
 rand    = "0.8"
+log = "0.4.29"
+bs58 = "0.5.1"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

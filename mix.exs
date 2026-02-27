@@ -92,7 +92,9 @@ defmodule Alem.MixProject do
       {:phoenix_pubsub, "~> 2.1"},
 
       # UUID generation
-      {:uuid, "~> 1.1"}
+      {:uuid, "~> 1.1"},
+
+      {:corsica, "~> 2.0"}
     ]
   end
 

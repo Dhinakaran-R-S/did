@@ -19,20 +19,22 @@ defmodule AlemWeb.NamespacePleromaController do
 
     case PleromaIntegration.ensure_namespace_for_pleroma_account(account_id, token) do
       {:ok, user_id, _account_info} ->
-        # Get namespace status
         case Namespace.status(user_id) do
           {:ok, status} ->
             conn
             |> put_status(:ok)
             |> json(%{
-              namespace: format_namespace_status(status, account_info)
+              namespace: format_namespace_status(status, account_info),
+              did: user_id,           # ← ADD THIS — user_id IS the DID
+              user_id: user_id,       # ← ADD THIS — so Tauri knows real user_id
+              identity_type: "hybrid" # ← ADD THIS — tells Tauri DID is active
             })
 
           error ->
             Logger.error("Failed to get namespace status: #{inspect(error)}")
             conn
             |> put_status(:internal_server_error)
-            |> json(%{error: "Failed to get namespace status", details: inspect(error)})
+            |> json(%{error: "Failed to get namespace status"})
         end
 
       {:error, :invalid_token} ->
